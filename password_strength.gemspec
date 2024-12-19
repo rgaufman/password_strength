@@ -1,4 +1,4 @@
-require "./lib/password_strength/version"
+require_relative 'lib/password_strength/version'
 
 Gem::Specification.new do |s|
   s.name                  = "password_strength"
