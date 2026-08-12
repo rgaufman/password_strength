@@ -1,3 +1,5 @@
+# frozen_string_literal: true
+
 class User
   include ActiveModel::Validations
 
@@ -7,8 +9,11 @@ class User
     update_attributes(attributes)
   end
 
+  # Assign the attributes and run the validations, so a test can read back
+  # either the errors or the record itself.
   def update_attributes(attributes = {})
-    attributes.each {|name, value| public_send "#{name}=", value }
+    attributes.each { |name, value| public_send "#{name}=", value }
     valid?
+    self
   end
 end

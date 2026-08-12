@@ -1,0 +1,8 @@
+ru:
+  activerecord:
+    errors: &ERRORS
+      messages:
+        too_weak: "недостаточно надёжен; используйте буквы (заглавные и строчные), цифры и специальные символы"
+
+  errors:
+    <<: *ERRORS

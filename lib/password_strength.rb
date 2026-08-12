@@ -1,12 +1,16 @@
-require "active_model"
-require "password_strength/base"
-require "password_strength/engine" if defined?(Rails::Engine)
-require "password_strength/active_model"
-require "password_strength/validators/windows2008"
+# frozen_string_literal: true
 
-# I18n.load_path += Dir[File.dirname(__FILE__) + "/../locales/**/*.yml"]
-I18n.load_path += Dir[File.expand_path("../../locales/*.yml", __FILE__)]
+require 'active_model'
+require 'password_strength/base'
+require 'password_strength/engine' if defined?(Rails::Engine)
+require 'password_strength/active_model'
+require 'password_strength/validators/windows2008'
 
+I18n.load_path += Dir[File.expand_path('../locales/*.yml', __dir__)]
+
+# Check a password against the scoring rules in PasswordStrength::Scoring and
+# the list in PasswordStrength::Blocklist, either directly through
+# PasswordStrength.test or through the validates_strength_of validator.
 module PasswordStrength
   # Test the password strength by applying several rules.
   # The username is required to match its substring in passwords.

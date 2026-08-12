@@ -1,0 +1,8 @@
+fr:
+  activerecord:
+    errors: &ERRORS
+      messages:
+        too_weak: "n'est pas sûr : utilisez des lettres (majuscules et minuscules), des chiffres et des caractères spéciaux"
+
+  errors:
+    <<: *ERRORS

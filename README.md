@@ -2,7 +2,7 @@
 
 Check password strength against several rules. Includes ActiveRecord/ActiveModel support.
 
-<a href="https://travis-ci.org/fnando/password_strength"><img src="https://travis-ci.org/fnando/password_strength.svg" alt="Build Status" /></a>
+This is a fork of [fnando/password_strength](https://github.com/fnando/password_strength). It runs on Ruby 4.0, adds a minimum length you set yourself, recognises a blocklisted word written in leet, lets you supply your own blocklist, and reports why a password was rejected.
 
 Validates the strength of a password according to several rules:
 
@@ -14,7 +14,8 @@ Validates the strength of a password according to several rules:
 * password contains username
 * sequences (123, abc, aaa)
 * repetitions
-* can't be a common password (view list at support/common.txt)
+* can't be a common password (view list at support/common.txt), including
+  `P@ssw0rd` and `password2024`, which fold onto `password`
 
 Some results:
 
@@ -33,8 +34,10 @@ gem install password_strength
 or put this in your Gemfile:
 
 ```ruby
-gem "password_strength"
+gem "password_strength", github: "rgaufman/password_strength", branch: "master"
 ```
+
+The gem needs Ruby 4.0 or newer and ActiveModel 6.0 or newer.
 
 The JavaScript code is also available as a NPM package.
 
@@ -67,7 +70,48 @@ strength.valid?(:strong)
 
 strength.valid?(:good)
 #=> strength == :good or strength == :strong
+
+strength.invalid_reason
+#=> why it was rejected outright: :too_short, :common_word,
+#   :repeated_character, :excluded_characters, or nil
 ```
+
+## Minimum length
+
+Pass `min_length` and a shorter password is rejected outright, whatever score
+its other characteristics would earn. Leave it out and no hard minimum applies.
+
+```ruby
+strength = PasswordStrength.test("johndoe", "^P4ss$", min_length: 12)
+strength.status
+#=> :invalid
+
+strength.invalid_reason
+#=> :too_short
+```
+
+The same option works on the validator, where it reports the standard Rails
+`too_short` message ("is too short (minimum is 12 characters)") rather than the
+generic strength one.
+
+```ruby
+validates_strength_of :password, with: :email, min_length: 12
+```
+
+## Your own blocklist
+
+The bundled list in `support/common.txt` covers the passwords people reach for
+first. Replace it with a larger one, for example the breached passwords from
+Have I Been Pwned, by assigning your own list.
+
+```ruby
+PasswordStrength::Base.blocklist = File.readlines("breached.txt", chomp: true)
+```
+
+Every entry is compared in lower case. The comparison also folds away the
+character substitutions people use to dress a word up, so an entry of
+`password` rejects `password`, `Password`, `P@ssw0rd` and `password2024`.
+Assign `nil` to go back to the bundled list.
 
 ## ActiveRecord/ActiveModel
 
@@ -95,7 +139,7 @@ class Person
 end
 ```
 
-The default options are `:level => :good, :with => :username`.
+The default options are `level: :good, with: :username`.
 
 If you want to compare your password against other field, you have to set the `:with` option.
 
@@ -144,6 +188,10 @@ PasswordStrength implements two validators: `PasswordStrength::Base` and `Passwo
 ## JavaScript
 
 The PasswordStrength also implements the algorithm in the JavaScript.
+
+The JavaScript port carries the original rules only. It does not know about
+`min_length`, the leet folding, or a blocklist you supplied in Ruby, so treat it
+as an indicator in the browser and keep the Ruby validation as the decision.
 
 ```javascript
 var strength = PasswordStrength.test("johndoe", "mypass");
@@ -204,12 +252,18 @@ If you're using asset pipeline, just add the following lines to your `applicatio
 //= require jquery_strength
 ```
 
+## Translations
+
+The gem ships the `too_weak` message in English, Portuguese, Spanish, French,
+Hebrew, Russian and Ukrainian (as both `uk` and `ua`). The `too_short` message
+comes from Rails itself, so rails-i18n covers it in every locale it supports.
+
 ## Running tests
 
 ### Ruby
 
 1. Install all dependencies with `bundle install`.
-2. Run `rake test`.
+2. Run `rake`, which runs the tests and RuboCop.
 
 ### JavaScript
 

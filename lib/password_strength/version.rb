@@ -1,8 +1,10 @@
+# frozen_string_literal: true
+
 module PasswordStrength
   module Version # :nodoc: all
-    MAJOR = 1
-    MINOR = 1
-    PATCH = 5
-    STRING = "#{MAJOR}.#{MINOR}.#{PATCH}"
+    MAJOR = 2
+    MINOR = 0
+    PATCH = 0
+    STRING = "#{MAJOR}.#{MINOR}.#{PATCH}".freeze
   end
 end

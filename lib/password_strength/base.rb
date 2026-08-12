@@ -1,15 +1,39 @@
+# frozen_string_literal: true
+
+require 'password_strength/blocklist'
+require 'password_strength/scoring'
+require 'password_strength/status'
+
 module PasswordStrength
+  # Score a password against the rules in PasswordStrength::Scoring and the
+  # list in PasswordStrength::Blocklist, and report the result as a status of
+  # :invalid, :weak, :good or :strong.
   class Base
-    MULTIPLE_NUMBERS_RE = /\d.*?\d.*?\d/
-    MULTIPLE_SYMBOLS_RE = /[!@#\$%^&*?_~-].*?[!@#\$%^&*?_~-]/
-    SYMBOL_RE = /[!@#\$%^&*?_~-]/
-    UPPERCASE_LOWERCASE_RE = /([a-z].*[A-Z])|([A-Z].*[a-z])/
+    include Blocklist
+    include Scoring
+    include Status
+
     PASSWORD_LIMIT = 1_000
     USERNAME_LIMIT = 50_000
-    INVALID = :invalid
-    WEAK = :weak
-    STRONG = :strong
-    GOOD = :good
+
+    # Kept where they have always been, so that code written against
+    # PasswordStrength::Base::WEAK still finds them.
+    INVALID = Status::INVALID
+    WEAK = Status::WEAK
+    STRONG = Status::STRONG
+    GOOD = Status::GOOD
+
+    WEAK_SCORE = 35
+    STRONG_SCORE = 70
+    MAXIMUM_SCORE = 100
+
+    # Kept where they have always been, so that a validator written against
+    # PasswordStrength::Base::SYMBOL_RE still finds them.
+    MULTIPLE_NUMBERS_RE = Scoring::MULTIPLE_NUMBERS_RE
+    MULTIPLE_SYMBOLS_RE = Scoring::MULTIPLE_SYMBOLS_RE
+    SYMBOL_RE = Scoring::SYMBOL_RE
+    UPPERCASE_LOWERCASE_RE = Scoring::UPPERCASE_LOWERCASE_RE
+    LEET_SUBSTITUTIONS = Blocklist::LEET_SUBSTITUTIONS
 
     # Hold the username that will be matched against password.
     attr_accessor :username
@@ -18,20 +42,17 @@ module PasswordStrength
     attr_accessor :password
 
     # The score for the latest test. Will be +nil+ if the password has not been tested.
-    attr_reader   :score
-
-    # The current test status. Can be +:weak+, +:good+, +:strong+ or +:invalid+.
-    attr_reader   :status
+    attr_reader :score
 
     # The ActiveRecord instance.
     # It only makes sense if you're creating a custom ActiveRecord validator.
-    attr_reader   :record
+    attr_reader :record
 
     # Set what characters cannot be present on password.
     # Can be a regular expression or array.
     #
-    #   strength = PasswordStrength.test("john", "password with whitespaces", :exclude => [" ", "asdf"])
-    #   strength = PasswordStrength.test("john", "password with whitespaces", :exclude => /\s/)
+    #   strength = PasswordStrength.test("john", "password with whitespaces", exclude: [" ", "asdf"])
+    #   strength = PasswordStrength.test("john", "password with whitespaces", exclude: /\s/)
     #
     # Then you can check the test result:
     #
@@ -43,24 +64,20 @@ module PasswordStrength
     #
     attr_accessor :exclude
 
-    # Return an array of strings that represents
-    # common passwords. The default list is taken
-    # from several online sources (just Google for 'most common passwords').
+    # The minimum number of characters a password must have. A password shorter
+    # than this is rejected outright (status +:invalid+), whatever score its
+    # other characteristics would earn. Leave it +nil+ to apply no hard
+    # minimum, in which case a password under six characters is only penalised
+    # through the score.
     #
-    # Notable sources:
+    #   strength = PasswordStrength.test("johndoe", "^P4ss$", min_length: 12)
+    #   strength.status
+    #   #=> :invalid
     #
-    # * http://www.whatsmypass.com/the-top-500-worst-passwords-of-all-time
-    # * http://elementdesignllc.com/2009/12/twitters-most-common-passwords/
+    #   strength.invalid_reason
+    #   #=> :too_short
     #
-    # The current list has 3.6KB and its load into memory just once.
-    def self.common_words
-      @common_words ||= begin
-        file = File.open(File.expand_path("../../../support/common.txt", __FILE__))
-        words = file.each_line.to_a.map(&:chomp)
-        file.close
-        words
-      end
-    end
+    attr_accessor :min_length
 
     def initialize(username, password, options = {})
       @username = username.to_s[0...USERNAME_LIMIT]
@@ -68,208 +85,77 @@ module PasswordStrength
       @score = 0
       @exclude = options[:exclude]
       @record = options[:record]
+      @min_length = options[:min_length]
     end
 
-    # Check if the password has the specified score.
-    # Level can be +:weak+, +:good+ or +:strong+.
-    def valid?(level = GOOD)
-      case level
-      when STRONG then
-        strong?
-      when GOOD then
-        good? || strong?
-      else
-        !invalid?
-      end
-    end
+    # Check if the password has fewer characters than
+    # PasswordStrength::Base#min_length. Always false when no minimum has been
+    # set.
+    def too_short?
+      return false unless min_length
 
-    # Check if the password has been detected as strong.
-    def strong?
-      status == STRONG
-    end
-
-    # Mark password as strong.
-    def strong!
-      @status = STRONG
-    end
-
-    # Check if the password has been detected as weak.
-    def weak?
-      status == WEAK
-    end
-
-    # Mark password as weak.
-    def weak!
-      @status = WEAK
-    end
-
-    # Check if the password has been detected as good.
-    def good?
-      status == GOOD
-    end
-
-    # Mark password as good.
-    def good!
-      @status = GOOD
-    end
-
-    # Check if password has invalid characters based on PasswordStrength::Base#exclude.
-    def invalid?
-      status == INVALID
-    end
-
-    # Mark password as invalid.
-    def invalid!
-      @status = INVALID
-    end
-
-    # Return the score for the specified rule.
-    # Available rules:
-    #
-    # * :password_size
-    # * :numbers
-    # * :symbols
-    # * :uppercase_lowercase
-    # * :numbers_chars
-    # * :numbers_symbols
-    # * :symbols_chars
-    # * :only_chars
-    # * :only_numbers
-    # * :username
-    # * :sequences
-    def score_for(name)
-      score = 0
-
-      case name
-      when :password_size then
-        if password.size < 6
-          score = -100
-        else
-          score = password.size * 4
-        end
-      when :numbers then
-        score = 5 if password =~ MULTIPLE_NUMBERS_RE
-      when :symbols then
-        score = 5 if password =~ MULTIPLE_SYMBOLS_RE
-      when :uppercase_lowercase then
-        score = 10 if password =~ UPPERCASE_LOWERCASE_RE
-      when :numbers_chars then
-        score = 15 if password =~ /[a-z]/i && password =~ /[0-9]/
-      when :numbers_symbols then
-        score = 15 if password =~ /[0-9]/ && password =~ SYMBOL_RE
-      when :symbols_chars then
-        score = 15 if password =~ /[a-z]/i && password =~ SYMBOL_RE
-      when :only_chars then
-        score = -15 if password =~ /^[a-z]+$/i
-      when :only_numbers then
-        score = -15 if password =~ /^\d+$/
-      when :username then
-        if password == username
-          score = -100
-        else
-          score = -15 if password =~ /#{Regexp.escape(username)}/
-        end
-      when :sequences then
-        score = -15 * sequences(password)
-        score += -15 * sequences(password.to_s.reverse)
-      when :repetitions then
-        score += -(repetitions(password, 2) * 4)
-        score += -(repetitions(password, 3) * 3)
-        score += -(repetitions(password, 4) * 2)
-      end
-
-      score
+      password.size < min_length
     end
 
     # Run all tests on password and return the final score.
     def test
       @score = 0
+      @invalid_reason = nil
+      reason = rejection_reason
 
-      if contain_invalid_matches?
-        invalid!
-      elsif common_word?
-        invalid!
-      elsif contain_invalid_repetion?
-        invalid!
-      else
-        @score += score_for(:password_size)
-        @score += score_for(:numbers)
-        @score += score_for(:symbols)
-        @score += score_for(:uppercase_lowercase)
-        @score += score_for(:numbers_chars)
-        @score += score_for(:numbers_symbols)
-        @score += score_for(:symbols_chars)
-        @score += score_for(:only_chars)
-        @score += score_for(:only_numbers)
-        @score += score_for(:username)
-        @score += score_for(:sequences)
-        @score += score_for(:repetitions)
-
-        @score = 0 if score < 0
-        @score = 100 if score > 100
-
-        weak!   if score < 35
-        good!   if score >= 35 && score < 70
-        strong! if score >= 70
+      if reason
+        invalid!(reason)
+        return score
       end
+
+      @score = total_score
+      classify
 
       score
     end
 
-    def common_word? # :nodoc:
-      self.class.common_words.include?(password.downcase)
-    end
-
     def contain_invalid_matches? # :nodoc:
       return false unless exclude
+
       regex = exclude
-      regex = /#{exclude.collect {|i| Regexp.escape(i)}.join("|")}/ if exclude.kind_of?(Array)
-      password.to_s =~ regex
+      regex = /#{exclude.collect { |i| Regexp.escape(i) }.join('|')}/ if exclude.is_a?(Array)
+      password.to_s.match?(regex)
     end
 
-    def contain_invalid_repetion?
+    def contain_invalid_repetion? # :nodoc:
       char = password.to_s.chars.first
-      return unless char
-      regex = /^#{Regexp.escape(char)}+$/i
-      password.to_s =~ regex
+      return false unless char
+
+      password.to_s.match?(/^#{Regexp.escape(char)}+$/i)
     end
 
-    def repetitions(text, size) # :nodoc:
-      count = 0
-      matches = []
+    private
 
-      0.upto(text.size - 1) do |i|
-        substring = text[i, size]
+    # The reason to reject the password outright, or nil when it is worth
+    # scoring.
+    def rejection_reason
+      return :too_short if too_short?
+      return :excluded_characters if contain_invalid_matches?
+      return :common_word if common_word?
+      return :repeated_character if contain_invalid_repetion?
 
-        next if matches.include?(substring) || substring.size < size
-
-        matches << substring
-        occurrences = text.scan(/#{Regexp.escape(substring)}/).length
-        count += 1 if occurrences > 1
-      end
-
-      count
+      nil
     end
 
-    def sequences(text) # :nodoc:
-      matches = 0
-      sequence_size = 0
-      bytes = []
+    def total_score
+      total = Scoring::RULES.keys.sum { |rule| score_for(rule) }
 
-      text.to_s.each_byte do |byte|
-        previous_byte = bytes.last
-        bytes << byte
+      total.clamp(0, MAXIMUM_SCORE)
+    end
 
-        if previous_byte && ((byte == previous_byte + 1) || (previous_byte == byte))
-          sequence_size += 1
-        else
-          sequence_size = 0
-        end
-
-        matches += 1 if sequence_size == 2
+    def classify
+      if score < WEAK_SCORE
+        weak!
+      elsif score < STRONG_SCORE
+        good!
+      else
+        strong!
       end
-
-      matches
     end
   end
 end

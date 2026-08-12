@@ -1,20 +1,13 @@
-ENV["BUNDLE_GEMFILE"] ||= File.expand_path("../../Gemfile", __FILE__)
-require "bundler/setup"
+# frozen_string_literal: true
 
-require "minitest/autorun"
+ENV['BUNDLE_GEMFILE'] ||= File.expand_path('../Gemfile', __dir__)
+require 'bundler/setup'
 
-if defined?(Minitest::Test)
-  begin
-    require "minitest/utils"
-  rescue LoadError
-  end
-else
-  Minitest::Test = MiniTest::Unit::TestCase
-end
+require 'minitest/autorun'
+require 'minitest/utils'
 
-require "ostruct"
-require "active_model"
-require "active_support/all"
+require 'active_model'
+require 'active_support/all'
 
 I18n.enforce_available_locales = false
-require "password_strength"
+require 'password_strength'

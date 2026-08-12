@@ -1,0 +1,12 @@
+uk: &uk
+  activerecord:
+    errors: &ERRORS
+      messages:
+        too_weak: "недостатньо надійний; використовуйте літери (великі та малі), цифри та спеціальні символи"
+
+  errors:
+    <<: *ERRORS
+
+# Some applications label Ukrainian "ua" rather than the ISO code "uk".
+ua:
+  <<: *uk

@@ -1,0 +1,8 @@
+he:
+  activerecord:
+    errors: &ERRORS
+      messages:
+        too_weak: "אינה מאובטחת; יש להשתמש באותיות (גדולות וקטנות), במספרים ובתווים מיוחדים"
+
+  errors:
+    <<: *ERRORS
