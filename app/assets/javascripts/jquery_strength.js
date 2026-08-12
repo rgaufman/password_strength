@@ -20,6 +20,7 @@
     var strength = new PasswordStrength();
 
     strength.exclude = options["exclude"];
+    strength.minLength = options["minLength"];
 
     callback = callback || $.strength.callback;
 

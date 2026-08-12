@@ -187,11 +187,11 @@ PasswordStrength implements two validators: `PasswordStrength::Base` and `Passwo
 
 ## JavaScript
 
-The PasswordStrength also implements the algorithm in the JavaScript.
-
-The JavaScript port carries the original rules only. It does not know about
-`min_length`, the leet folding, or a blocklist you supplied in Ruby, so treat it
-as an indicator in the browser and keep the Ruby validation as the decision.
+The PasswordStrength also implements the algorithm in the JavaScript, including
+the minimum length, the rejection reasons and the folded blocklist comparison.
+A blocklist you set in Ruby does not travel to the browser, so set it on both
+sides if you replace the bundled list, and keep the Ruby validation as the
+decision rather than the browser check.
 
 ```javascript
 var strength = PasswordStrength.test("johndoe", "mypass");
@@ -199,15 +199,29 @@ strength.isGood();
 strength.isStrong();
 strength.isWeak();
 strength.isValid("good");
+strength.invalidReason; // "too_short", "common_word", "repeated_character", "excluded_characters", or null
 ```
 
 The API is basically the same!
 
-You can use the `:exclude` option. Only regular expressions are supported for now.
+You can use the `exclude` and `minLength` options. Only regular expressions are
+supported for `exclude`.
 
 ```javascript
 var strength = PasswordStrength.test("johndoe", "password with whitespaces", {exclude: /\s/});
 strength.isInvalid();
+
+var strength = PasswordStrength.test("johndoe", "^P4ss$", {minLength: 12});
+strength.invalidReason;
+//=> "too_short"
+```
+
+Replace the bundled list of common passwords with your own by assigning
+`PasswordStrength.blocklist`, and set it back to `null` to restore the bundled
+one.
+
+```javascript
+PasswordStrength.blocklist = ["tetherx", "hunter2"];
 ```
 
 Additionaly, a jQuery plugin is available.
@@ -267,8 +281,11 @@ comes from Rails itself, so rails-i18n covers it in every locale it supports.
 
 ### JavaScript
 
-1. Install Node.js, then run `npm install`.
-2. Open `test/password_strength_test.html` in your target browser.
+1. Install Node.js.
+2. Run `npm test`, which runs `test/js/*.test.mjs` through the Node test runner.
+   `rake` runs the same tests alongside the Ruby ones.
+3. For the jQuery plugin, run `npm install` and open
+   `test/password_strength_test.html` in your target browser.
 
 ## License
 

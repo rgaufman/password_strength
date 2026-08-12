@@ -14,4 +14,9 @@ end
 require 'rubocop/rake_task'
 RuboCop::RakeTask.new
 
-task default: %i[test rubocop]
+desc 'Run the JavaScript tests through the Node test runner'
+task :test_js do
+  sh 'node --test "test/js/*.test.mjs"'
+end
+
+task default: %i[test test_js rubocop]
