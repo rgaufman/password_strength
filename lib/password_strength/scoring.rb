@@ -13,30 +13,30 @@ module PasswordStrength
     LETTERS_ONLY_RE = /^[a-z]+$/i
     NUMBERS_ONLY_RE = /^\d+$/
 
+    # The length below which a password is penalised rather than scored on its
+    # length. It is not the same thing as PasswordStrength::Base#min_length,
+    # which rejects a password outright: this one only applies when no hard
+    # minimum has been set.
+    SHORT_PASSWORD_SIZE = 6
+
     # The rules PasswordStrength::Base#test applies, in the order it applies
-    # them, each pointing at the method that scores it.
-    RULES = {
-      password_size: :score_password_size,
-      numbers: :score_numbers,
-      symbols: :score_symbols,
-      uppercase_lowercase: :score_uppercase_lowercase,
-      numbers_chars: :score_numbers_chars,
-      numbers_symbols: :score_numbers_symbols,
-      symbols_chars: :score_symbols_chars,
-      only_chars: :score_only_chars,
-      only_numbers: :score_only_numbers,
-      username: :score_username,
-      sequences: :score_sequences,
-      repetitions: :score_repetitions
-    }.freeze
+    # them. Each is scored by the private method of the same name, prefixed
+    # with "score_".
+    RULES = %i[
+      password_size numbers symbols uppercase_lowercase numbers_chars
+      numbers_symbols symbols_chars only_chars only_numbers username
+      sequences repetitions
+    ].freeze
+
+    RULE_METHODS = RULES.map { |rule| :"score_#{rule}" }.freeze
 
     # Return the score for one of the rules in RULES. Asking for a rule that
     # does not exist raises, rather than scoring it as zero and hiding the typo.
     def score_for(name)
-      rule = RULES[name.to_sym]
-      raise ArgumentError, "Unknown scoring rule: #{name.inspect}. Known rules are #{RULES.keys.join(', ')}" unless rule
+      index = RULES.index(name.to_sym)
+      raise ArgumentError, "Unknown scoring rule: #{name.inspect}. Known rules are #{RULES.join(', ')}" unless index
 
-      send(rule)
+      send(RULE_METHODS[index])
     end
 
     # Count the sequences in the text, such as abc or 123, both of which are
@@ -60,23 +60,30 @@ module PasswordStrength
 
     # Count how many substrings of the given size appear more than once.
     def repetitions(text, size) # :nodoc:
-      matches = []
+      seen = Set.new
 
       0.upto(text.size - 1) do |index|
         substring = text[index, size]
 
-        next if matches.include?(substring) || substring.size < size
-
-        matches << substring
+        seen << substring unless substring.size < size
       end
 
-      matches.count { |substring| text.scan(/#{Regexp.escape(substring)}/).length > 1 }
+      seen.count { |substring| repeated?(text, substring) }
     end
 
     private
 
+    # Whether the substring appears more than once, counted the way String#scan
+    # counts it: occurrences do not overlap, and the search stops at the second
+    # one rather than collecting every match.
+    def repeated?(text, substring)
+      first = text.index(substring)
+
+      !first.nil? && !text.index(substring, first + substring.size).nil?
+    end
+
     def score_password_size
-      password.size < 6 ? -100 : password.size * 4
+      password.size < SHORT_PASSWORD_SIZE ? -100 : password.size * 4
     end
 
     def score_numbers
@@ -113,7 +120,7 @@ module PasswordStrength
 
     def score_username
       return -100 if password == username
-      return -15 if password.match?(/#{Regexp.escape(username)}/)
+      return -15 if password.include?(username)
 
       0
     end

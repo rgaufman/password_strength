@@ -16,24 +16,13 @@ module PasswordStrength
     PASSWORD_LIMIT = 1_000
     USERNAME_LIMIT = 50_000
 
-    # Kept where they have always been, so that code written against
-    # PasswordStrength::Base::WEAK still finds them.
-    INVALID = Status::INVALID
-    WEAK = Status::WEAK
-    STRONG = Status::STRONG
-    GOOD = Status::GOOD
-
     WEAK_SCORE = 35
     STRONG_SCORE = 70
     MAXIMUM_SCORE = 100
 
-    # Kept where they have always been, so that a validator written against
+    # The constants the three included modules define, such as WEAK and
+    # SYMBOL_RE, resolve through the ancestors, so code written against
     # PasswordStrength::Base::SYMBOL_RE still finds them.
-    MULTIPLE_NUMBERS_RE = Scoring::MULTIPLE_NUMBERS_RE
-    MULTIPLE_SYMBOLS_RE = Scoring::MULTIPLE_SYMBOLS_RE
-    SYMBOL_RE = Scoring::SYMBOL_RE
-    UPPERCASE_LOWERCASE_RE = Scoring::UPPERCASE_LOWERCASE_RE
-    LEET_SUBSTITUTIONS = Blocklist::LEET_SUBSTITUTIONS
 
     # Hold the username that will be matched against password.
     attr_accessor :username
@@ -123,10 +112,11 @@ module PasswordStrength
     end
 
     def contain_invalid_repetion? # :nodoc:
-      char = password.to_s.chars.first
+      text = password.to_s
+      char = text[0]
       return false unless char
 
-      password.to_s.match?(/^#{Regexp.escape(char)}+$/i)
+      text.each_char.all? { |other| other.casecmp?(char) }
     end
 
     private
@@ -143,7 +133,7 @@ module PasswordStrength
     end
 
     def total_score
-      total = Scoring::RULES.keys.sum { |rule| score_for(rule) }
+      total = Scoring::RULE_METHODS.sum { |rule| send(rule) }
 
       total.clamp(0, MAXIMUM_SCORE)
     end

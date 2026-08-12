@@ -20,7 +20,7 @@ module PasswordStrength
       CATEGORIES = [/[A-Z]/, /[a-z]/, /[0-9]/, PasswordStrength::Base::SYMBOL_RE].freeze
 
       def test
-        return invalid!(:too_short) if too_short? || password.size < MINIMUM_LENGTH
+        return invalid!(:too_short) if password.size < [min_length.to_i, MINIMUM_LENGTH].max
         return invalid!(:too_few_categories) if variety < MINIMUM_VARIETY
         return invalid!(:contains_username) if password_contains_username?
 

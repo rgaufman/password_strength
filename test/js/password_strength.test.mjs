@@ -48,6 +48,14 @@ describe("blocklist", () => {
     assert.equal(strength.invalidReason, "common_word");
   });
 
+  // Digits fold as well as symbols do: a class built with a backslash in front
+  // of a digit reads as an octal escape and silently stops matching it.
+  it("rejects a common password written with digits for letters", () => {
+    const strength = PasswordStrength.test("johndoe", "l3tm31n");
+
+    assert.equal(strength.invalidReason, "common_word");
+  });
+
   it("rejects a common password followed by digits", () => {
     const strength = PasswordStrength.test("johndoe", "monkey2024");
 
@@ -102,22 +110,16 @@ describe("sequences", () => {
 });
 
 describe("parity with the Ruby scoring", () => {
-  const cases = [
-    ["sunny", "invalid"],
-    ["password1", "invalid"],
-    ["Sh0rt!Pass", "invalid"],
-    ["P@ssw0rd2026", "invalid"],
-    ["aaaaaaaaaaaa", "invalid"],
-    ["abcdefghijkl", "weak"],
-    ["Coffee7Rain!", "strong"],
-    ["blue-River-42-lamp", "strong"]
-  ];
+  // The same corpus test/parity_test.rb asserts against, so a rule that changes
+  // on one side and not the other fails here or there.
+  const fixture = require("../fixtures/parity.json");
 
-  for (const [password, status] of cases) {
+  for (const { password, status, reason } of fixture.cases) {
     it(`judges ${password} as ${status}`, () => {
-      const strength = PasswordStrength.test("james.bond@example.com", password, { minLength: 12 });
+      const strength = PasswordStrength.test(fixture.username, password, { minLength: fixture.min_length });
 
       assert.equal(strength.status, status);
+      assert.equal(strength.invalidReason, reason);
     });
   }
 });

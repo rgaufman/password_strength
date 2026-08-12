@@ -31,6 +31,14 @@ class TestBlocklist < Minitest::Test
     assert_equal :common_word, strength.invalid_reason
   end
 
+  # Digits fold as well as symbols do: a class built with a backslash in front
+  # of a digit reads as an octal escape and silently stops matching it.
+  def test_reject_common_word_written_with_digits_for_letters
+    strength = PasswordStrength.test('johndoe', 'l3tm31n')
+
+    assert_equal :common_word, strength.invalid_reason
+  end
+
   def test_reject_common_word_followed_by_digits
     strength = PasswordStrength.test('johndoe', 'monkey2024')
 

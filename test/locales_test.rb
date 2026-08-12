@@ -6,10 +6,7 @@ class TestLocales < Minitest::Test
   ENGLISH_TOO_WEAK = 'is not secure; use letters (uppercase and downcase), numbers and special characters'
 
   def setup
-    PasswordStrength.enabled = true
-    Object.class_eval { remove_const('User') } if defined?(User)
-    load 'user.rb'
-    @user = User.new
+    @user = load_user_class
     User.validates_strength_of :password
   end
 

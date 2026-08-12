@@ -1,0 +1,17 @@
+{
+  "username": "james.bond@example.com",
+  "min_length": 12,
+  "cases": [
+    { "password": "sunny", "status": "invalid", "reason": "too_short" },
+    { "password": "password1", "status": "invalid", "reason": "too_short" },
+    { "password": "Sh0rt!Pass", "status": "invalid", "reason": "too_short" },
+    { "password": "P@ssw0rd2026", "status": "invalid", "reason": "common_word" },
+    { "password": "passwordpassword", "status": "weak", "reason": null },
+    { "password": "aaaaaaaaaaaa", "status": "invalid", "reason": "repeated_character" },
+    { "password": "abcdefghijkl", "status": "weak", "reason": null },
+    { "password": "Coffee7Rain!", "status": "strong", "reason": null },
+    { "password": "blue-River-42-lamp", "status": "strong", "reason": null },
+    { "password": "Secret25Rain!", "status": "strong", "reason": null },
+    { "password": "correct horse battery staple", "status": "strong", "reason": null }
+  ]
+}

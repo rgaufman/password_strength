@@ -4,9 +4,7 @@ require 'test_helper'
 
 class Window2008Test < Minitest::Test
   def setup
-    PasswordStrength.enabled = true
-    Object.class_eval { remove_const('User') } if defined?(User)
-    load 'user.rb'
+    load_user_class
     User.validates_strength_of :password, using: PasswordStrength::Validators::Windows2008
 
     @user = User.new(username: 'Administrator')

@@ -4,11 +4,7 @@ require 'test_helper'
 
 class TestActiveModel < Minitest::Test
   def setup
-    PasswordStrength.enabled = true
-    Object.class_eval { remove_const('User') } if defined?(User)
-    load 'user.rb'
-    @user = User.new
-    I18n.locale = :en
+    @user = load_user_class
   end
 
   def test_respond_to_validates_strength_of

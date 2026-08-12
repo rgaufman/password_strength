@@ -14,6 +14,14 @@ module PasswordStrength
 
     TRAILING_DIGITS_RE = /\d+\z/
 
+    # The same table as the two arguments String#tr wants. Every key and value
+    # is one character and none of the keys is a tr metacharacter, so the table
+    # transfers verbatim and one pass replaces a per-character map.
+    LEET_FROM = LEET_SUBSTITUTIONS.keys.join.freeze
+    LEET_TO = LEET_SUBSTITUTIONS.values.join.freeze
+
+    NON_ASCII_RE = /[^\x00-\x7F]/
+
     class << self
       # Return an array of strings that represents common passwords. The
       # default list is taken from several online sources (just Google for
@@ -27,11 +35,6 @@ module PasswordStrength
       # The current list has 3.6KB and is loaded into memory just once.
       def common_words
         @common_words ||= File.readlines(File.expand_path('../../support/common.txt', __dir__), chomp: true)
-      end
-
-      # The bundled words as a Set, so a lookup does not walk the whole list.
-      def common_words_set
-        @common_words_set ||= Set.new(common_words)
       end
 
       # The list someone supplied through PasswordStrength::Base.blocklist=, or
@@ -49,21 +52,21 @@ module PasswordStrength
       # Set it to nil to go back to the bundled list of common passwords.
       def blocklist=(words)
         @blocklist = words
-        @blocklist_set = words && Set.new(words.map { |word| word.to_s.downcase })
+        @blocklist_set = nil
       end
 
-      # The words a password is compared against.
+      # The words a password is compared against, in the same lower case the
+      # candidates are folded into, so an entry such as "DEFAULT" can match.
       def blocklist_set
-        @blocklist_set || common_words_set
+        @blocklist_set ||= Set.new((blocklist || common_words).map { |word| word.to_s.downcase })
       end
     end
 
-    # The same four readers and one writer, on any class that includes this
-    # module, so PasswordStrength::Base.blocklist = [...] keeps working and a
-    # subclass sees the same list.
+    # The readers and the writer, on any class that includes this module, so
+    # PasswordStrength::Base.blocklist = [...] keeps working and a subclass sees
+    # the same list.
     module ClassMethods
       def common_words = Blocklist.common_words
-      def common_words_set = Blocklist.common_words_set
       def blocklist = Blocklist.blocklist
 
       def blocklist=(words)
@@ -89,8 +92,10 @@ module PasswordStrength
 
     # Every form of the password the blocklist is checked against.
     def blocklist_candidates(text) # :nodoc:
-      normalised = text.to_s.unicode_normalize(:nfkc).downcase
-      leet = normalised.chars.map { |char| LEET_SUBSTITUTIONS.fetch(char, char) }.join
+      normalised = text.to_s
+      normalised = normalised.unicode_normalize(:nfkc) if normalised.match?(NON_ASCII_RE)
+      normalised = normalised.downcase
+      leet = normalised.tr(LEET_FROM, LEET_TO)
 
       [normalised, leet, normalised.sub(TRAILING_DIGITS_RE, ''), leet.sub(TRAILING_DIGITS_RE, '')]
         .reject(&:empty?)
